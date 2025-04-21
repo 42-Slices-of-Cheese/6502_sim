@@ -40,12 +40,12 @@ void panic(char msg[]);
 
 void set_clr_flgs(CPU *cpu, char flag, bool val);
 
-void ins_lda_abs(CPU *cpu, Memory *memory);
-void ins_lda_ind(CPU *cpu, Memory *mem, bool ref);
+void lda_abs(CPU *cpu, Memory *memory);
+void lda_ind(CPU *cpu, Memory *mem, bool ref);
 
-void ins_ld_im(CPU *cpu, Memory *mem, char reg);
-void ins_ld_abs(CPU *cpu, Memory *mem, char reg, bool ref);
-void ins_ld_zp(CPU *cpu, Memory *mem, char reg, bool ref);
+void ld_im(CPU *cpu, Memory *mem, char reg);
+void ld_abs(CPU *cpu, Memory *mem, char reg, bool ref);
+void ld_zp(CPU *cpu, Memory *mem, char reg, bool ref);
 
 void inc_dec_reg(CPU *cpu, Memory *mem, char reg, bool dir);
 void inc_dec_mem(CPU *cpu, Memory *mem, char opt, bool dir);
@@ -59,6 +59,15 @@ void store_zp(CPU *cpu, Memory *mem, char reg, bool ref);
 void trasfer(CPU *cpu, char src, char dst);
 
 void bit_op(CPU *cpu, byte data, char mode);
+
+void bit_op_im_abs(CPU *cpu, Memory *mem, bool opt, char mode);
+void bit_op_zp(CPU *cpu, Memory *mem, bool opt, char mode);
+void bit_op_abs(CPU *cpu, Memory *mem, bool opt, char mode);
+void bit_op_ind(CPU *cpu, Memory *mem, bool opt, char mode);
+
+
+
+byte packFlags(CPU *cpu);
 
 
 void start(CPU *cpu, Memory *mem, unsigned int step_count);
@@ -127,7 +136,7 @@ void start(CPU *cpu, Memory *mem, unsigned int step_count)
 
             case 0x2:
                 if(high_nibble == 0xA)
-                    ins_ld_im(cpu, mem, 'X');
+                    ld_im(cpu, mem, 'X');
                 else
                     panic("Illegal opcode!");
                 break;
@@ -334,24 +343,28 @@ void set_clr_flgs(CPU *cpu, char flag, bool val)
     }
 }
 
-void ins_lda_abs(CPU *cpu, Memory *memory)
+void lda_abs(CPU *cpu, Memory *memory)
 {
-    word addr = memory->data[++cpu->PC] + (memory->data[++cpu->PC] << 8);
+    word addr = memory->data[++cpu->PC];
+    addr += memory->data[++cpu->PC] << 8;
     byte value = memory->data[addr];
     
     load_n_set(cpu, 'A', value);
 }
 
-void ins_lda_ind(CPU *cpu, Memory *mem, bool ref)
+void lda_ind(CPU *cpu, Memory *mem, bool ref)
 {
     word vector;
     word addr;
     if(!ref){
         vector = (mem->data[++cpu->PC] + cpu->X) & 0xFF;
-        addr = mem->data[vector] + (mem->data[++vector] << 8);
+        addr = mem->data[vector];
+        addr += (((word) mem->data[++vector]) << 8);
     }else{
         vector = mem->data[++cpu->PC];
-        addr = mem->data[vector] + (mem->data[++vector] << 8) + cpu->Y;
+        addr = mem->data[vector];
+        addr += (((word) mem->data[++vector]) << 8);
+        addr += cpu->Y;
     }
 
     byte value = mem->data[addr];
@@ -359,15 +372,16 @@ void ins_lda_ind(CPU *cpu, Memory *mem, bool ref)
 }
 
 
-void ins_ld_im(CPU *cpu, Memory *mem, char reg)
+void ld_im(CPU *cpu, Memory *mem, char reg)
 {
     byte value = mem->data[++cpu->PC];
     load_n_set(cpu, reg, value);
 }
 
-void ins_ld_abs(CPU *cpu, Memory *mem, char reg, bool ref)
+void ld_abs(CPU *cpu, Memory *mem, char reg, bool ref)
 {
-    word addr = mem->data[++cpu->PC] + (mem->data[++cpu->PC] << 8);
+    word addr = mem->data[++cpu->PC];
+    addr += (((word) mem->data[++cpu->PC]) << 8);
 
     switch (reg)
     {
@@ -397,7 +411,7 @@ void ins_ld_abs(CPU *cpu, Memory *mem, char reg, bool ref)
     load_n_set(cpu, reg, value);
 }
 
-void ins_ld_zp(CPU *cpu, Memory *mem, char reg, bool ref)
+void ld_zp(CPU *cpu, Memory *mem, char reg, bool ref)
 {
     word addr = mem->data[++cpu->PC];
 
@@ -457,7 +471,7 @@ void inc_dec_mem(CPU *cpu, Memory *mem, char opt, bool dir)
         break;
     
     case 'A':
-        addr += mem->data[++cpu->PC] << 8;
+        addr += (((word) mem->data[++cpu->PC]) << 8);
         
         if(dir)
             mem->data[addr]++;
@@ -476,7 +490,7 @@ void inc_dec_mem(CPU *cpu, Memory *mem, char opt, bool dir)
         break;
     
     case 'B':
-        addr += (mem->data[++cpu->PC] << 8) + cpu->X;
+        addr += (((word) mem->data[++cpu->PC]) << 8) + cpu->X;
 
         if(dir)
             mem->data[addr]++;
@@ -494,7 +508,8 @@ void inc_dec_mem(CPU *cpu, Memory *mem, char opt, bool dir)
 
 void sta_abs(CPU *cpu, Memory *mem, bool ref)
 {
-    word addr = mem->data[++cpu->PC] + (mem->data[++cpu->PC] << 8);
+    word addr = mem->data[++cpu->PC];
+    addr += (((word) mem->data[++cpu->PC]) << 8);
 
     if(!ref) 
         addr += cpu->X;
@@ -511,12 +526,15 @@ void sta_ind(CPU *cpu, Memory *mem, bool ref)
     if(!ref)
     {
         vector = (mem->data[++cpu->PC] + cpu->X) & 0xFF;
-        addr = mem->data[vector] + (mem->data[++vector] << 8);
+        addr = mem->data[vector];
+        addr += (((word) mem->data[++vector]) << 8);
     }
     else
     {
         vector = mem->data[++cpu->PC];
-        addr = mem->data[vector] + (mem->data[++vector] << 8) + cpu->Y;
+        addr = mem->data[vector];
+        addr += (((word) mem->data[++vector]) << 8);
+        addr += cpu->Y;
     }
 
     store_n_set(cpu, mem, 'A', addr);
@@ -524,7 +542,8 @@ void sta_ind(CPU *cpu, Memory *mem, bool ref)
 
 void store_abs(CPU *cpu, Memory *mem, char reg)
 {
-    word addr = mem->data[++cpu->PC] + (mem->data[++cpu->PC] << 8);
+    word addr = mem->data[++cpu->PC];
+    addr += (((word) mem->data[++cpu->PC]) << 8);
 
     store_n_set(cpu, mem, reg, addr);
 }
@@ -633,10 +652,10 @@ void bit_op(CPU *cpu, byte data, char mode)
 
 void bit_op_im_abs(CPU *cpu, Memory *mem, bool opt, char mode)
 {
-    byte next = mem->data[++cpu->PC];
+    word next = mem->data[++cpu->PC];
     byte data = next;
     if(opt)
-        data = mem->data[next + (mem->data[++cpu->PC] << 8)];
+        data = mem->data[next + (((word) mem->data[++cpu->PC]) << 8)];
 
     bit_op(cpu, data, mode);
 }
@@ -652,3 +671,116 @@ void bit_op_zp(CPU *cpu, Memory *mem, bool opt, char mode)
 
     bit_op(cpu, data, mode);
 }
+
+void bit_op_abs(CPU *cpu, Memory *mem, bool opt, char mode)
+{
+    word addr = mem->data[++cpu->PC];
+    addr += (((word) mem->data[++cpu->PC]) << 8);
+
+    if(opt)
+        addr += cpu->X;
+    else
+        addr += cpu->Y;
+    
+    byte data = mem->data[addr];
+    bit_op(cpu, data, mode);
+}
+
+void bit_op_ind(CPU *cpu, Memory *mem, bool opt, char mode)
+{
+    word vector;
+    word addr;
+    if(!opt)
+    {
+        vector = (mem->data[++cpu->PC] + cpu->X) & 0xFF;
+        addr = mem->data[vector];
+        addr += (((word) mem->data[++vector]) << 8);
+    }
+    else
+    {
+        vector = mem->data[++cpu->PC];
+        addr = mem->data[vector];
+        addr += (((word) mem->data[++vector]) << 8);
+        addr += cpu->Y;
+    }
+
+    byte data = mem->data[addr];
+
+    bit_op(cpu, data, mode);
+}
+
+void bit_test(CPU *cpu, Memory *mem, bool opt)
+{
+
+}
+
+
+byte packFlags(CPU *cpu)
+{
+    return (cpu->N << 7) |
+           (cpu->V << 6) |
+           (cpu->unused << 5) |
+           (cpu->B << 4) |
+           (cpu->D << 3) |
+           (cpu->I << 2) |
+           (cpu->Z << 1) |
+           (cpu->C);
+}
+
+void unpackFlags(CPU *cpu, byte value)
+{
+    cpu->C      = (value >> 0) & 1;
+    cpu->Z      = (value >> 1) & 1;
+    cpu->I      = (value >> 2) & 1;
+    cpu->D      = (value >> 3) & 1;
+    cpu->B      = (value >> 4) & 1;
+    cpu->unused = (value >> 5) & 1;
+    cpu->V      = (value >> 6) & 1;
+    cpu->N      = (value >> 7) & 1;
+}
+
+void stack(CPU *cpu, Memory *mem, bool opt, bool reg)
+{
+    word addr = 0x0100;
+
+    if(!opt)
+    {
+        addr += cpu->S--;
+        byte data;
+
+        if(!reg)
+            data = cpu->A;
+        else
+            data = packFlags(cpu);
+
+        mem->data[addr] = data;
+    }
+    else
+    {
+        addr += ++cpu->S;
+        byte data = mem->data[addr];
+
+        if(!reg)
+            load_n_set(cpu, 'A', data);
+        else
+            unpackFlags(cpu, data);
+    }
+}
+
+void jmp(CPU *cpu, Memory *mem, bool opt)
+{
+    word vector = mem->data[++cpu->PC];
+    vector += (((word) mem->data[++cpu->PC]) << 8);
+    word addr;
+    if(!opt)
+        addr = vector;
+    else
+    {
+        addr = mem->data[vector];
+        addr += (((word) mem->data[++vector]) << 8);
+    }
+    
+    cpu->PC = mem->data[addr];
+    cpu->PC--;
+}
+
