@@ -1,2 +1,6 @@
 .vscode/
 main
+
+build/
+
+6502_main
