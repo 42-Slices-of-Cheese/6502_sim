@@ -7,8 +7,7 @@
 
 void CPU::fetch()
 {
-    ins = memory.read_memory(PC);
-    PC++;
+    ins = memory.read_memory(PC++);
 }
 
 void CPU::decode()
@@ -277,10 +276,11 @@ void CPU::decode()
         }
         default:
         {
-            if(version.WD)
+            if (version.WD)
             {
-                decoded_ins.type == "OTHER";
-                decoded_ins.mnemonic == "NOP";
+                decoded_ins.type = "OTHER";
+                decoded_ins.addr_mode = "IMP";
+                decoded_ins.mnemonic = "NOP";
             }
             else
             {
@@ -293,15 +293,15 @@ void CPU::decode()
 
 void CPU::execute()
 {
-    if(decoded_ins.type == "ACCESS")
+    if (decoded_ins.type == "ACCESS")
     {
         access_ins();
     }
-    else if(decoded_ins.type == "TRANSFER")
+    else if (decoded_ins.type == "TRANSFER")
     {
         trasfer_ins();
     }
-    else if(decoded_ins.type == "OTHER")
+    else if (decoded_ins.type == "OTHER")
     {
         other_ins();
     }
@@ -311,42 +311,42 @@ void CPU::execute()
     }
 }
 
+/**
+ * 
+ * Access instructions are LDA, LDX, LDY, STA, STX, STY
+ * 
+ */
 void CPU::access_ins()
 {
     word addr = decode_addr();
 
-    if(decoded_ins.mnemonic == "LDA")
+    byte data = memory.read_memory(addr);
+
+    if (decoded_ins.mnemonic == "LDA")
     {    
-        A = memory.read_memory(addr);
-        PC++;
+        A = data;
 
         set_flags("A");
     }
-    else if(decoded_ins.mnemonic == "LDX")
+    else if (decoded_ins.mnemonic == "LDX")
     {
-        byte data = memory.read_memory(addr);
-        PC++;
-
         X = data;
         set_flags("X");
     }
-    else if(decoded_ins.mnemonic == "LDY")
+    else if (decoded_ins.mnemonic == "LDY")
     {
-        byte data = memory.read_memory(addr);
-        PC++;
-        
         Y = data;
         set_flags("Y");
     }
-    else if(decoded_ins.mnemonic == "STA")
+    else if (decoded_ins.mnemonic == "STA")
     {
         memory.write_memory(addr, A);
     }
-    else if(decoded_ins.mnemonic == "STX")
+    else if (decoded_ins.mnemonic == "STX")
     {
         memory.write_memory(addr, X);
     }
-    else if(decoded_ins.mnemonic == "STY")
+    else if (decoded_ins.mnemonic == "STY")
     {
         memory.write_memory(addr, Y);
     }
@@ -358,31 +358,31 @@ void CPU::access_ins()
 
 void CPU::trasfer_ins()
 {
-    if(decoded_ins.mnemonic == "TAX")
+    if (decoded_ins.mnemonic == "TAX")
     {
         X = A;
         set_flags("X");
     }
-    else if(decoded_ins.mnemonic == "TAY")
+    else if (decoded_ins.mnemonic == "TAY")
     {
         Y = A;
         set_flags("Y");
     }
-    else if(decoded_ins.mnemonic == "TSX")
+    else if (decoded_ins.mnemonic == "TSX")
     {
         X = SP;
         set_flags("X");
     }
-    else if(decoded_ins.mnemonic == "TXA")
+    else if (decoded_ins.mnemonic == "TXA")
     {
         A = X;
         set_flags("A");
     }
-    else if(decoded_ins.mnemonic == "TXS")
+    else if (decoded_ins.mnemonic == "TXS")
     {
         SP = X;
     }
-    else if(decoded_ins.mnemonic == "TSX")
+    else if (decoded_ins.mnemonic == "TSX")
     {
         X = SP;
         set_flags("X");
@@ -393,9 +393,54 @@ void CPU::trasfer_ins()
     }
 }
 
+/**
+ * 
+ * Negative, Zero, and Carry flags are set based on the result of the compare
+ * 
+ */
+void CPU::compare_ins()
+{
+    word addr = decode_addr();
+    byte mem_val = memory.read_memory(addr);
+    byte reg_val;
+
+    if (decoded_ins.mnemonic == "CMP")
+    {
+        reg_val = A;
+    }
+    else if (decoded_ins.mnemonic == "CPX")
+    {
+        reg_val = X;
+    }
+    else if (decoded_ins.mnemonic == "CPY")
+    {
+        reg_val = Y;
+    }
+    else
+    {
+        throw std::invalid_argument("Invalid Compare instruction");
+    }
+
+    //TODO: set N, Z, C flags to 0
+    if (reg_val >= mem_val)
+    {
+        //TODO: set carry flag
+    }
+     
+    if (reg_val == mem_val)
+    {
+        //TODO: set zero flag
+    }
+    
+    if ((reg_val - mem_val) & 0x80)
+    {
+        //TODO: set negative flag
+    }
+}
+
 void CPU::other_ins()
 {
-    if(decoded_ins.mnemonic == "NOP")
+    if (decoded_ins.mnemonic == "NOP")
     {
         // Do nothing
     }
@@ -414,38 +459,38 @@ void CPU::other_ins()
  */
 void CPU::set_flags(std::string_view reg)
 {
-    if(reg == "A")
+    if (reg == "A")
     {
-        if(A == 0)
+        if (A == 0)
         {
             PS |= 0b10000000;
         }
 
-        if(A >> 7 == 1)
+        if (A & 0x80)
         {
             PS |= 0b00000001;
         }
     }
-    else if(reg == "X")
+    else if (reg == "X")
     {
-        if(X == 0)
+        if (X == 0)
         {
             PS |= 0b10000000;
         }
 
-        if(X >> 7 == 1)
+        if (X & 0x80)
         {
             PS |= 0b00000001;
         }
     }
-    else if(reg == "Y")
+    else if (reg == "Y")
     {
-        if(Y == 0)
+        if (Y == 0)
         {
             PS |= 0b10000000;
         }
 
-        if(Y >> 7 == 1)
+        if (Y & 0x80)
         {
             PS |= 0b00000001;
         }
@@ -458,69 +503,25 @@ void CPU::set_flags(std::string_view reg)
 
 /**
  * 
- * Set carry flags for compare instructions
- * Also sets negative and zero flags 
- * 
- * Valid registers are A, X, Y
+ * Set negative, zero, and carry flags for compare instructions
  * 
  */
-void CPU::set_flags(std::string_view reg, byte compare)
+void CPU::set_flags(byte value, byte compare)
 {
     //TODO: set N, Z, C flags to 0
-    if(reg == "A")
+    if (value >= compare)
     {
-        if(A >= compare)
-        {
-            //TODO: set carry flag
-        }
-
-        if(A == compare)
-        {
-            //TODO: set zero flag
-        }
-
-        if((A - compare) >> 7 == 1)
-        {
-            //TODO: set negative flag
-        }
+        //TODO: set carry flag
     }
-    else if(reg == "X")
+     
+    if (value == compare)
     {
-        if(X >= compare)
-        {
-            //TODO: set carry flag
-        }
-
-        if(X == compare)
-        {
-            //TODO: set zero flag
-        }
-
-        if((X - compare) >> 7 == 1)
-        {
-            //TODO: set negative flag
-        }
+        //TODO: set zero flag
     }
-    else if(reg== "Y")
+    
+    if ((value - compare) & 0x80)
     {
-        if(Y >= compare)
-        {
-            //TODO: set carry flag
-        }
-
-        if(Y == compare)
-        {
-            //TODO: set zero flag
-        }
-
-        if((Y - compare) >> 7 == 1)
-        {
-            //TODO: set negative flag
-        }
-    }
-    else
-    {
-        throw std::invalid_argument("Valid registers are A, X, Y");
+        //TODO: set negative flag
     }
 }
 
@@ -528,70 +529,62 @@ word CPU::decode_addr()
 {
     word addr;
 
-    if(decoded_ins.addr_mode == "IMD")
+    if (decoded_ins.addr_mode == "IMD")
     {
-        addr = PC;
-        PC--;       // The PC is incremented at the end
+        addr = PC++;
     }
-    else if(decoded_ins.addr_mode == "ZP")
+    else if (decoded_ins.addr_mode == "ZP")
     {
-        addr = memory.read_memory(PC);
+        addr = memory.read_memory(PC++);
     }
-    else if(decoded_ins.addr_mode == "ZP_X")
+    else if (decoded_ins.addr_mode == "ZP_X")
     {
-        addr = memory.read_memory(PC);
-        addr += X;
+        addr = (memory.read_memory(PC++) + X) & 0xFF;
     }
-    else if(decoded_ins.addr_mode == "ABS")
+    else if (decoded_ins.addr_mode == "ABS")
     {
-        addr = memory.read_memory(PC) << 8;
-        PC++;
+        byte lo = memory.read_memory(PC++);
+        byte hi = memory.read_memory(PC++);
 
-        addr = addr + memory.read_memory(PC);
+        addr = (hi << 8) | lo;
     }
-    else if(decoded_ins.addr_mode == "ABS_X")
+    else if (decoded_ins.addr_mode == "ABS_X")
     {
-        addr = memory.read_memory(PC) << 8;
-        PC++;
+        byte lo = memory.read_memory(PC++);
+        byte hi = memory.read_memory(PC++);
 
-        addr = addr + memory.read_memory(PC);
-        addr += X;
+        addr = ((hi << 8) | lo) + X;
     }
-    else if(decoded_ins.addr_mode == "ABS_Y")
+    else if (decoded_ins.addr_mode == "ABS_Y")
     {
-        addr = memory.read_memory(PC) << 8;
-        PC++;
+        byte lo = memory.read_memory(PC++);
+        byte hi = memory.read_memory(PC++);
 
-        addr = addr + memory.read_memory(PC);
-
-        addr += Y;
+        addr = ((hi << 8) | lo) + Y;
     }
-    else if(decoded_ins.addr_mode == "IND_X")
+    else if (decoded_ins.addr_mode == "IND_X")
     {
-        byte tmp = memory.read_memory(PC);
-        tmp += X;
-        
-        addr = memory.read_memory(tmp) << 8;
-        tmp++;
+        byte zp = memory.read_memory(PC++);
+        zp += X;
 
-        addr += memory.read_memory(tmp);
+        byte lo = memory.read_memory(zp);
+        byte hi = memory.read_memory((byte)(zp + 1));
+
+        addr = (hi << 8) | lo;
     }
-    else if(decoded_ins.addr_mode == "IND_Y")
+    else if (decoded_ins.addr_mode == "IND_Y")
     {
-        byte tmp = memory.read_memory(PC);
+        byte zp = memory.read_memory(PC++);
 
-        addr = memory.read_memory(tmp) << 8;
-        tmp++;
+        byte lo = memory.read_memory(zp);
+        byte hi = memory.read_memory((byte)(zp + 1));
 
-        addr += memory.read_memory(tmp);
-        addr += Y;
+        addr = ((hi << 8) | lo) + Y;
     }
     else
     {
         throw std::invalid_argument("Invalid addressing mode.");
     }
-
-    PC++;
 
     return addr;
 }
@@ -604,16 +597,16 @@ word CPU::decode_addr()
  */
 CPU::CPU(RAM& pass_memory, std::string_view option, bool INVOPS) : memory(pass_memory)
 {
-    if(option == "WD")
+    if (option == "WD")
     {
         version.WD = true;
     }
-    else if(option == "REV_D")
+    else if (option == "REV_D")
     {
         version.REV_D = true;
     }
 
-    if(INVOPS)
+    if (INVOPS)
     {
         version.INVOPS = true;
     }
@@ -627,23 +620,23 @@ CPU::~CPU()
 
 void CPU::write_register(std::string_view reg, byte value)
 {
-    if(reg == "A")
+    if (reg == "A")
     {
         A = value;
     }
-    else if(reg == "X")
+    else if (reg == "X")
     {
         X = value;
     }
-    else if(reg == "Y")
+    else if (reg == "Y")
     {
         Y = value;
     }
-    else if(reg == "SP")
+    else if (reg == "SP")
     {
         SP = value;
     }
-    else if(reg == "PS")
+    else if (reg == "PS")
     {
         PS = value;
     }
@@ -656,7 +649,7 @@ void CPU::write_register(std::string_view reg, byte value)
 
 void CPU::write_register(std::string_view reg, word value)
 {
-    if(reg == "PC")
+    if (reg == "PC")
     {
         PC = value;
     }
@@ -668,27 +661,27 @@ void CPU::write_register(std::string_view reg, word value)
 
 byte CPU::read_register(std::string_view reg)
 {
-    if(reg == "A")
+    if (reg == "A")
     {
         return A;
     }
-    else if(reg == "X")
+    else if (reg == "X")
     {
         return X;
     }
-    else if(reg == "Y")
+    else if (reg == "Y")
     {
         return Y;
     }
-    else if(reg == "SP")
+    else if (reg == "SP")
     {
         return SP;
     }
-    else if(reg == "PS")
+    else if (reg == "PS")
     {
         return PS;
     }
-    else if(reg == "ins")
+    else if (reg == "ins")
     {
         return ins;
     }

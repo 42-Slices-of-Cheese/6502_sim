@@ -54,9 +54,10 @@ class CPU
 
         void access_ins();
         void trasfer_ins();
+        void compare_ins();
         void other_ins();
         void set_flags(std::string_view reg);
-        void set_flags(std::string_view reg, byte compare);
+        void set_flags(byte value, byte compare);
         word decode_addr();
  
     public:
