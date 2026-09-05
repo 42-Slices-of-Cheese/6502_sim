@@ -1,9 +1,8 @@
 #include "CPU.hpp"
 #include "RAM.hpp"
 
-#include <string_view>
-#include <stdexcept>
-#include <format>
+#include <print>
+#include <iostream>
 
 void CPU::fetch()
 {
@@ -54,6 +53,7 @@ void CPU::decode()
             decoded_ins.type = "TRANSFER";
             decoded_ins.addr_mode = "IMP";
             decoded_ins.mnemonic = "TXA";
+            break;
         }
         case 0x8C:
         {
@@ -109,6 +109,7 @@ void CPU::decode()
             decoded_ins.type = "TRANSFER";
             decoded_ins.addr_mode = "IMP";
             decoded_ins.mnemonic = "TYA";
+            break;
         }
         case 0x99:
         {
@@ -122,6 +123,7 @@ void CPU::decode()
             decoded_ins.type = "TRANSFER";
             decoded_ins.addr_mode = "IMP";
             decoded_ins.mnemonic = "TXS";
+            break;
         }
         case 0x9D:
         {
@@ -177,6 +179,7 @@ void CPU::decode()
             decoded_ins.type = "TRANSFER";
             decoded_ins.addr_mode = "IMP";
             decoded_ins.mnemonic = "TAY";
+            break;
         }
         case 0xA9:
         {
@@ -190,6 +193,7 @@ void CPU::decode()
             decoded_ins.type = "TRANSFER";
             decoded_ins.addr_mode = "IMP";
             decoded_ins.mnemonic = "TAX";
+            break;
         }
         case 0xAC:
         {
@@ -252,6 +256,7 @@ void CPU::decode()
             decoded_ins.type = "TRANSFER";
             decoded_ins.addr_mode = "IMP";
             decoded_ins.mnemonic = "TSX";
+            break;
         }
         case 0xBC:
         {
@@ -284,7 +289,8 @@ void CPU::decode()
             }
             else
             {
-                throw std::invalid_argument("Invalid opcode");
+                std::println("Invalid opcode: {}", decoded_ins.mnemonic);
+                std::exit(EXIT_FAILURE);
             }
             break;
         }
@@ -307,7 +313,8 @@ void CPU::execute()
     }
     else
     {
-        throw std::invalid_argument("Ivalid instruction type");
+        std::println("Invalid instruction type: {}", decoded_ins.type);
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -352,7 +359,8 @@ void CPU::access_ins()
     }
     else
     {
-        throw std::invalid_argument("Ivalid Access instruction");
+        std::println(std::cerr, "Invalid Access instruction: {}", decoded_ins.mnemonic);
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -389,7 +397,8 @@ void CPU::trasfer_ins()
     }
     else
     {
-        throw std::invalid_argument("Invalid tansfer instruction");
+        std::println(std::cerr, "Invalid Transfer instruction: {}", decoded_ins.mnemonic);
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -418,7 +427,8 @@ void CPU::compare_ins()
     }
     else
     {
-        throw std::invalid_argument("Invalid Compare instruction");
+        std::println(std::cerr, "Invalid Compare instruction: {}", decoded_ins.mnemonic);
+        std::exit(EXIT_FAILURE);
     }
 
     //TODO: set N, Z, C flags to 0
@@ -446,7 +456,8 @@ void CPU::other_ins()
     }
     else
     {
-        throw std::invalid_argument("Invalid Other instruction");
+        std::println(std::cerr, "Invalid Other instruction: {}", decoded_ins.mnemonic);
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -497,7 +508,9 @@ void CPU::set_flags(std::string_view reg)
     }
     else
     {
-        throw std::invalid_argument("Valid registers are A, X, Y");
+        std::println(std::cerr, "Invalid register: {}\n"
+                                "Valid registers are A, X, Y", reg);
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -567,8 +580,8 @@ word CPU::decode_addr()
         byte zp = memory.read_memory(PC++);
         zp += X;
 
-        byte lo = memory.read_memory(zp);
-        byte hi = memory.read_memory((byte)(zp + 1));
+        byte lo = memory.read_memory(zp++);
+        byte hi = memory.read_memory(zp);
 
         addr = (hi << 8) | lo;
     }
@@ -576,14 +589,15 @@ word CPU::decode_addr()
     {
         byte zp = memory.read_memory(PC++);
 
-        byte lo = memory.read_memory(zp);
-        byte hi = memory.read_memory((byte)(zp + 1));
+        byte lo = memory.read_memory(zp++);
+        byte hi = memory.read_memory(zp);
 
         addr = ((hi << 8) | lo) + Y;
     }
     else
     {
-        throw std::invalid_argument("Invalid addressing mode.");
+        std::println(std::cerr, "Invalid addressing mode");
+        std::exit(EXIT_FAILURE);
     }
 
     return addr;
@@ -591,8 +605,7 @@ word CPU::decode_addr()
 
 /**
  * 
- * Valid options are WD, REV_D
- * All other options are considered the original 6502
+ * Valid options are WD, REV_D, 6502
  * 
  */
 CPU::CPU(RAM& pass_memory, std::string_view option, bool INVOPS) : memory(pass_memory)
@@ -604,6 +617,15 @@ CPU::CPU(RAM& pass_memory, std::string_view option, bool INVOPS) : memory(pass_m
     else if (option == "REV_D")
     {
         version.REV_D = true;
+    }
+    else if (option == "6502")
+    {
+        // Do nothing        
+    }
+    else
+    {
+        std::println(std::cerr, "Invalid option: {}\n Valid options are 6502, REV_D, WD", option);
+        std::exit(EXIT_FAILURE);
     }
 
     if (INVOPS)
@@ -642,8 +664,10 @@ void CPU::write_register(std::string_view reg, byte value)
     }
     else
     {
-        throw std::invalid_argument("Valid registers are A, X, Y, SP, PS\n"
-                                    "PC requires a word instead of a byte");
+        std::println(std::cerr, "Invalid register: {}\n"
+                                "Valid registers are A, X, Y, SP, PS\n"
+                                "PC requires a word instead of a byte", reg);
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -655,7 +679,9 @@ void CPU::write_register(std::string_view reg, word value)
     }
     else
     {
-        throw std::invalid_argument("Valid word register is only PC");
+        std::println(std::cerr, "Invalid register: {}\n"
+                                "Valid word register is only PC", reg);
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -687,8 +713,10 @@ byte CPU::read_register(std::string_view reg)
     }
     else
     {
-        throw std::invalid_argument("Valid registers are A, X, Y, SP, PS\n"
-                                    "Read PC with read_PC()");
+        std::println(std::cerr, "Invalid register: {}\n"
+                                "Valid registers are A, X, Y, SP, PS\n"
+                                "Read PC with read_PC()", reg);
+        std::exit(EXIT_FAILURE);
     }
 }
 
